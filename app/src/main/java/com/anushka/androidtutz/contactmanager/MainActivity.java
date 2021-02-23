@@ -25,6 +25,13 @@ import com.anushka.androidtutz.contactmanager.db.entity.Contact;
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
 
 import java.util.ArrayList;
+import java.util.List;
+
+import io.reactivex.android.schedulers.AndroidSchedulers;
+import io.reactivex.disposables.CompositeDisposable;
+import io.reactivex.functions.Consumer;
+import io.reactivex.schedulers.Schedulers;
+
 
 public class MainActivity extends AppCompatActivity {
 
@@ -33,6 +40,7 @@ public class MainActivity extends AppCompatActivity {
     private RecyclerView recyclerView;
 //    private DatabaseHelper db;
     private ContactsAppDatabase contactsAppDatabase;
+    CompositeDisposable compositeDisposable = new CompositeDisposable();
 
 
 
@@ -48,7 +56,8 @@ public class MainActivity extends AppCompatActivity {
         contactsAppDatabase = Room.databaseBuilder(getApplicationContext(),ContactsAppDatabase.class,"ContactDB").allowMainThreadQueries().build();
 //        db = new DatabaseHelper(this);
 
-        contactArrayList.addAll(contactsAppDatabase.getContactDAO().getAllContacts());
+//        contactArrayList.addAll(contactsAppDatabase.getContactDAO().getAllContacts());
+
 
         contactsAdapter = new ContactsAdapter(this, contactArrayList, MainActivity.this);
         RecyclerView.LayoutManager mLayoutManager = new LinearLayoutManager(getApplicationContext());
@@ -56,6 +65,24 @@ public class MainActivity extends AppCompatActivity {
         recyclerView.setItemAnimator(new DefaultItemAnimator());
         recyclerView.setAdapter(contactsAdapter);
 
+       compositeDisposable.add( contactsAppDatabase.getContactDAO().getAllContactsUsingRx()
+               .subscribeOn(Schedulers.computation())
+               .observeOn(AndroidSchedulers.mainThread())
+               .subscribe(new Consumer<List<Contact>>() {
+                              @Override
+                              public void accept(List<Contact> contacts) throws Exception {
+                                  contactArrayList.clear();
+                                  contactArrayList.addAll(contacts);
+                                  contactsAdapter.notifyDataSetChanged();
+                              }
+                          }, new Consumer<Throwable>() {
+                              @Override
+                              public void accept(Throwable throwable) throws Exception {
+
+                              }
+                          }
+               )
+       );
 
         FloatingActionButton fab = (FloatingActionButton) findViewById(R.id.fab);
         fab.setOnClickListener(new View.OnClickListener() {
@@ -157,9 +184,9 @@ public class MainActivity extends AppCompatActivity {
 
     private void deleteContact(Contact contact, int position) {
 
-        contactArrayList.remove(position);
+//        contactArrayList.remove(position);
         contactsAppDatabase.getContactDAO().deleteContact(contact);
-        contactsAdapter.notifyDataSetChanged();
+//        contactsAdapter.notifyDataSetChanged();
     }
 
     private void updateContact(String name, String email, int position) {
@@ -171,9 +198,9 @@ public class MainActivity extends AppCompatActivity {
 
         contactsAppDatabase.getContactDAO().updateContact(contact);
 
-        contactArrayList.set(position, contact);
-
-        contactsAdapter.notifyDataSetChanged();
+//        contactArrayList.set(position, contact);
+//
+//        contactsAdapter.notifyDataSetChanged();
 
 
     }
@@ -184,14 +211,20 @@ public class MainActivity extends AppCompatActivity {
         long id = contactsAppDatabase.getContactDAO().addContact(new Contact(0,name,email));
 
 
-        Contact contact = contactsAppDatabase.getContactDAO().getContactBasedOnId(id);
-
-        if (contact != null) {
-
-            contactArrayList.add(0, contact);
-            contactsAdapter.notifyDataSetChanged();
-
-        }
+//        Contact contact = contactsAppDatabase.getContactDAO().getContactBasedOnId(id);
+//
+//        if (contact != null) {
+//
+//            contactArrayList.add(0, contact);
+//            contactsAdapter.notifyDataSetChanged();
+//
+//        }
 
     }
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        compositeDisposable.dispose();
+    }
+
 }

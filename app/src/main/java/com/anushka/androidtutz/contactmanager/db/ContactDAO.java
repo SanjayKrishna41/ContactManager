@@ -10,6 +10,8 @@ import com.anushka.androidtutz.contactmanager.db.entity.Contact;
 
 import java.util.List;
 
+import io.reactivex.Flowable;
+
 @Dao
 public interface ContactDAO
 {
@@ -24,6 +26,9 @@ public interface ContactDAO
 
     @Query("select * from contacts")
     public List<Contact> getAllContacts();
+
+    @Query("select * from contacts")
+    Flowable<List<Contact>> getAllContactsUsingRx();
 
     @Query("select * from contacts where contact_id == :contact_id")
     public Contact getContactBasedOnId(long contact_id);

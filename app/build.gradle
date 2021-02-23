@@ -4,7 +4,7 @@ android {
     compileSdkVersion 28
     defaultConfig {
         applicationId "com.anushka.androidtutz.contactmanager"
-        minSdkVersion 16
+        minSdkVersion 26
         targetSdkVersion 28
         versionCode 1
         versionName "1.0"
@@ -31,4 +31,12 @@ dependencies {
     def room_version = "2.2.6"
     implementation "androidx.room:room-runtime:$room_version"
     annotationProcessor "androidx.room:room-compiler:$room_version"
+    //rxjava and rxandroid dependencies
+    //RxJava 2
+    implementation "io.reactivex.rxjava2:rxjava:2.2.19"
+    implementation 'io.reactivex.rxjava2:rxandroid:2.1.1'
+    //Retrofit2 Adapter for RxJava 2
+    implementation "com.squareup.retrofit2:adapter-rxjava2:2.8.1"
+    //RxJava support for Room
+    implementation "androidx.room:room-rxjava2:$room_version"
 }
