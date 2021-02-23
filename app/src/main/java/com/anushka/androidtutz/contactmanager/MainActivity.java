@@ -4,9 +4,9 @@ import android.content.DialogInterface;
 import android.os.Bundle;
 import android.text.TextUtils;
 import android.view.LayoutInflater;
-import android.view.View;
 import android.view.Menu;
 import android.view.MenuItem;
+import android.view.View;
 import android.widget.EditText;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -27,9 +27,12 @@ import com.google.android.material.floatingactionbutton.FloatingActionButton;
 import java.util.ArrayList;
 import java.util.List;
 
+import io.reactivex.Completable;
 import io.reactivex.android.schedulers.AndroidSchedulers;
 import io.reactivex.disposables.CompositeDisposable;
+import io.reactivex.functions.Action;
 import io.reactivex.functions.Consumer;
+import io.reactivex.observers.DisposableCompletableObserver;
 import io.reactivex.schedulers.Schedulers;
 
 
@@ -38,10 +41,10 @@ public class MainActivity extends AppCompatActivity {
     private ContactsAdapter contactsAdapter;
     private ArrayList<Contact> contactArrayList = new ArrayList<>();
     private RecyclerView recyclerView;
-//    private DatabaseHelper db;
+    //    private DatabaseHelper db;
     private ContactsAppDatabase contactsAppDatabase;
     CompositeDisposable compositeDisposable = new CompositeDisposable();
-
+    private long rowId;
 
 
     @Override
@@ -53,7 +56,7 @@ public class MainActivity extends AppCompatActivity {
         getSupportActionBar().setTitle(" Contacts Manager");
 
         recyclerView = findViewById(R.id.recycler_view_contacts);
-        contactsAppDatabase = Room.databaseBuilder(getApplicationContext(),ContactsAppDatabase.class,"ContactDB").allowMainThreadQueries().build();
+        contactsAppDatabase = Room.databaseBuilder(getApplicationContext(), ContactsAppDatabase.class, "ContactDB").build();
 //        db = new DatabaseHelper(this);
 
 //        contactArrayList.addAll(contactsAppDatabase.getContactDAO().getAllContacts());
@@ -65,24 +68,24 @@ public class MainActivity extends AppCompatActivity {
         recyclerView.setItemAnimator(new DefaultItemAnimator());
         recyclerView.setAdapter(contactsAdapter);
 
-       compositeDisposable.add( contactsAppDatabase.getContactDAO().getAllContactsUsingRx()
-               .subscribeOn(Schedulers.computation())
-               .observeOn(AndroidSchedulers.mainThread())
-               .subscribe(new Consumer<List<Contact>>() {
-                              @Override
-                              public void accept(List<Contact> contacts) throws Exception {
-                                  contactArrayList.clear();
-                                  contactArrayList.addAll(contacts);
-                                  contactsAdapter.notifyDataSetChanged();
-                              }
-                          }, new Consumer<Throwable>() {
-                              @Override
-                              public void accept(Throwable throwable) throws Exception {
+        compositeDisposable.add(contactsAppDatabase.getContactDAO().getAllContactsUsingRx()
+                .subscribeOn(Schedulers.computation())
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribe(new Consumer<List<Contact>>() {
+                               @Override
+                               public void accept(List<Contact> contacts) throws Exception {
+                                   contactArrayList.clear();
+                                   contactArrayList.addAll(contacts);
+                                   contactsAdapter.notifyDataSetChanged();
+                               }
+                           }, new Consumer<Throwable>() {
+                               @Override
+                               public void accept(Throwable throwable) throws Exception {
 
-                              }
-                          }
-               )
-       );
+                               }
+                           }
+                )
+        );
 
         FloatingActionButton fab = (FloatingActionButton) findViewById(R.id.fab);
         fab.setOnClickListener(new View.OnClickListener() {
@@ -182,45 +185,80 @@ public class MainActivity extends AppCompatActivity {
         });
     }
 
-    private void deleteContact(Contact contact, int position) {
+    private void deleteContact(final Contact contact, int position) {
 
-//        contactArrayList.remove(position);
-        contactsAppDatabase.getContactDAO().deleteContact(contact);
-//        contactsAdapter.notifyDataSetChanged();
+        compositeDisposable.add(Completable.fromAction(new Action() {
+            @Override
+            public void run() throws Exception {
+                contactsAppDatabase.getContactDAO().deleteContact(contact);
+            }
+        }).subscribeOn(Schedulers.io())
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribeWith(new DisposableCompletableObserver() {
+                    @Override
+                    public void onComplete() {
+                        Toast.makeText(MainActivity.this, "Contact deleted Successfully", Toast.LENGTH_SHORT).show();
+                    }
+
+                    @Override
+                    public void onError(Throwable e) {
+                        Toast.makeText(MainActivity.this, "Error DELETE" + e.toString(), Toast.LENGTH_SHORT).show();
+                    }
+                }));
+
     }
 
     private void updateContact(String name, String email, int position) {
 
-        Contact contact = contactArrayList.get(position);
+        final Contact contact = contactArrayList.get(position);
 
         contact.setName(name);
         contact.setEmail(email);
 
-        contactsAppDatabase.getContactDAO().updateContact(contact);
+        compositeDisposable.add(Completable.fromAction(new Action() {
+            @Override
+            public void run() throws Exception {
+                contactsAppDatabase.getContactDAO().updateContact(contact);
+            }
+        }).subscribeOn(Schedulers.io())
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribeWith(new DisposableCompletableObserver() {
+                    @Override
+                    public void onComplete() {
+                        Toast.makeText(MainActivity.this, "Contact Updated Successfully", Toast.LENGTH_SHORT).show();
+                    }
 
-//        contactArrayList.set(position, contact);
-//
-//        contactsAdapter.notifyDataSetChanged();
+                    @Override
+                    public void onError(Throwable e) {
+                        Toast.makeText(MainActivity.this, "Error UPDATE" + e.toString(), Toast.LENGTH_SHORT).show();
+                    }
+                }));
 
-
-    }
-
-    private void createContact(String name, String email) {
-
-        //for auto generated values add zero
-        long id = contactsAppDatabase.getContactDAO().addContact(new Contact(0,name,email));
-
-
-//        Contact contact = contactsAppDatabase.getContactDAO().getContactBasedOnId(id);
-//
-//        if (contact != null) {
-//
-//            contactArrayList.add(0, contact);
-//            contactsAdapter.notifyDataSetChanged();
-//
-//        }
 
     }
+
+    private void createContact(final String name, final String email) {
+
+        compositeDisposable.add(Completable.fromAction(new Action() {
+            @Override
+            public void run() throws Exception {
+                rowId = contactsAppDatabase.getContactDAO().addContact(new Contact(0, name, email));
+            }
+        }).subscribeOn(Schedulers.io())
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribeWith(new DisposableCompletableObserver() {
+                    @Override
+                    public void onComplete() {
+                        Toast.makeText(MainActivity.this, "Contact Added Successfully", Toast.LENGTH_SHORT).show();
+                    }
+
+                    @Override
+                    public void onError(Throwable e) {
+                        Toast.makeText(MainActivity.this, "Error INSERT" + e.toString(), Toast.LENGTH_SHORT).show();
+                    }
+                }));
+    }
+
     @Override
     protected void onDestroy() {
         super.onDestroy();
